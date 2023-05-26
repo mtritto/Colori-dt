@@ -1,0 +1,6 @@
+#ignore .ui file
+*.ui
+.DS_Store
+Colori-dt.code-workspace
+```
+
