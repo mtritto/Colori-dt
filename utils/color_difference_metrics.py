@@ -4,6 +4,18 @@ import math
 from PIL import Image
 
 class ColorDifferenceMetrics:
+    # Description: This class contains methods for calculating color difference metrics.
+    #              The methods are based on four CIE color difference formulas:
+    #                   L*a*b* color space:
+    #                   - CIE76 (1976)
+    #                   - CIE94 (1994)
+    #                   - CIEDE2000 (2000)
+    #                   L*u*v* color space:
+    #                   - CIE76 (1976)
+    #              The RGB metric is based on the Euclidean distance between the RGB values.
+    #              The CMC metric is based on the CMC l:c (1984) color difference formula.
+#              The ICSM metric is an original implementation of the ICSM(2022) "inverse color similarity metric" ().
+
     def __init__(self) -> None:
         pass
 

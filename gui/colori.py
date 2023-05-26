@@ -2,17 +2,17 @@ import sys
 from PySide6.QtWidgets import QMainWindow, QApplication, QDialog, QFileDialog, QGraphicsScene, QGraphicsPixmapItem, QSplashScreen 
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtCore import QObject, QThread, QTimer
-from tests.src.gui import Ui_MainWindow
-from src.shape_error_dialog import Ui_Dialog as Ui_Dialog_shape_error
-from about_dialog import Ui_Dialog as Ui_Dialog_about
-from src.no_image_dialog import Ui_no_image_dialog as Ui_no_image_dialog
-from tests.src.neural_style_transfer import StyleTransfer
-from tests.src.color_difference_metrics import ColorDifferenceMetrics
 from PIL import Image
 import numpy as np
 import os
 import subprocess
 from time import sleep
+from gui.gui import Ui_MainWindow
+from gui.shape_error_dialog import Ui_Dialog as Ui_Dialog_shape_error
+from gui.about_dialog import Ui_Dialog as Ui_Dialog_about
+from gui.no_image_dialog import Ui_no_image_dialog as Ui_no_image_dialog
+from utils.neural_style_transfer import StyleTransfer
+from utils.color_difference_metrics import ColorDifferenceMetrics
 
 # Define a function to reset the images using a decorator
 
@@ -184,11 +184,11 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
     def open_pdf(self):
         # Open tjhe documentation pdf according to the OS
         if sys.platform.startswith('darwin'):
-            subprocess.call(('open', 'codice_matlab/ColorI-DMT.pdf'))
+            subprocess.call(('open', '.gui/resources/Colori-DT.pdf'))
         elif sys.platform.startswith('cygwin'):
-            os.startfile('codice_matlab/ColorI-DMT.pdf')
+            os.startfile('.gui/resources/Colori-DT.pdf')
         elif os.name == 'posix':
-            subprocess.call(('xdg-open', 'codice_matlab/ColorI-DMT.pdf'))
+            subprocess.call(('xdg-open', '.gui/resources/Colori-DT.pdf'))
 
     def enable_transfer(self):
         if self.reference_image != None and self.test_image != None:
@@ -311,8 +311,7 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
         self.prog_epoch.repaint()
         self.prog_epoch.update()
 
-
-if __name__ == '__main__':
+def main():
     app = QApplication(sys.argv)
     pixmap = QPixmap("splash.png")
     splash = QSplashScreen(pixmap)
@@ -322,5 +321,7 @@ if __name__ == '__main__':
     app.processEvents()  
     gui = Gui()
     sys.exit(app.exec())
+
+
     
 
