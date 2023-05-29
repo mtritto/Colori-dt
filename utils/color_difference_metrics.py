@@ -5,7 +5,7 @@ from PIL import Image
 
 class ColorDifferenceMetrics:
     # Description: This class contains methods for calculating color difference metrics.
-    #              The methods are based on four CIE color difference formulas:
+    #              The methods are based on seven color difference formulas:
     #                   L*a*b* color space:
     #                   - CIE76 (1976)
     #                   - CIE94 (1994)
@@ -14,12 +14,26 @@ class ColorDifferenceMetrics:
     #                   - CIE76 (1976)
     #              The RGB metric is based on the Euclidean distance between the RGB values.
     #              The CMC metric is based on the CMC l:c (1984) color difference formula.
-#              The ICSM metric is an original implementation of the ICSM(2022) "inverse color similarity metric" ().
-
-    def __init__(self) -> None:
-        pass
+    #              The ICSM metric is an original implementation of the ICSM(2022) "inverse color similarity metric" (Jaafar et al. 2022).
+    #             
+    #              The class expects images in the RGB color space, and converts them to the appropriate color space
+    #              accordingly to the selected metric before calculating the color difference.
+    #              The class expects images to be of the same size.
+    #
+    # Parameters:(k_L, k_1, k_2) for ciede2000 and cie94, ratio l:c for CMC, ref_angle for ICSM
+    #
+    # Returns:    grayscale image in the form of a numpy array with the same size as the input images, uint8
+    
+    def __init__(self, k_L=1.0, k_1=0.045, k_2=0.015, ratio=2.0, ref_angle=30):
+        self.k_L = k_L
+        self.k_1 = k_1
+        self.k_2 = k_2
+        self.ratio = ratio
+        self.ref_angle = ref_angle
 
     def cie76_lab(self, reference_image, test_image):
+        if reference_image.shape != test_image.shape:
+            raise ValueError("Reference and test images must have the same size")
         # Convert images to LAB color space
         reference_image = cv2.cvtColor(reference_image, cv2.COLOR_RGB2LAB)
         test_image = cv2.cvtColor(test_image, cv2.COLOR_RGB2LAB)
@@ -30,6 +44,8 @@ class ColorDifferenceMetrics:
         return deltaE 
 
     def cie76_luv(self, reference_image, test_image):
+        if reference_image.shape != test_image.shape:
+            raise ValueError("Reference and test images must have the same size")
         # Convert images to LUV color space
         reference_image = cv2.cvtColor(reference_image, cv2.COLOR_RGB2LUV)
         test_image = cv2.cvtColor(test_image, cv2.COLOR_RGB2LUV)
@@ -39,8 +55,16 @@ class ColorDifferenceMetrics:
 
         return deltaE
 
-    def cie94(self, reference_image, test_image, k_L, k_1, k_2):
-        # Convert images to LAB color space    # Convert images to LAB color space
+    def cie94(self, reference_image, test_image, k_L=None, k_1=None, k_2=None):
+        if reference_image.shape != test_image.shape:
+            raise ValueError("Reference and test images must have the same size")
+        if k_L is None:
+            k_L = self.k_L
+        if k_1 is None:
+            k_1 = self.k_1
+        if k_2 is None:
+            k_2 = self.k_2
+        # Convert images to LAB color space  
         reference_image = cv2.cvtColor(reference_image, cv2.COLOR_RGB2LAB)
         test_image = cv2.cvtColor(test_image, cv2.COLOR_RGB2LAB)
 
@@ -70,15 +94,23 @@ class ColorDifferenceMetrics:
 
         # Calculate weighting factors
         s_l = 1
-        S_C = 1 + k_1*c1
+        s_c = 1 + k_1*c1
         s_h = 1 + k_2*c1
 
         # Calculate total color difference
-        delta_E = np.sqrt(np.power((delta_L/(k_L*s_l)),2) + np.power((delta_C_prime/(k_C*S_C)),2) + np.power((delta_h_prime/(k_H*s_h)),2)).astype("uint8")
+        delta_E = np.sqrt(np.power((delta_L/(k_L*s_l)),2) + np.power((delta_C_prime/(k_C*s_c)),2) + np.power((delta_h_prime/(k_H*s_h)),2)).astype("uint8")
 
         return delta_E
 
-    def ciede2000(self, reference_image, test_image, k_L, k_1, k_2):
+    def ciede2000(self, reference_image, test_image,  k_L=None, k_1=None, k_2=None):
+        if reference_image.shape != test_image.shape:
+            raise ValueError("Reference and test images must have the same size")
+        if k_L is None:
+            k_L = self.k_L
+        if k_1 is None:
+            k_1 = self.k_1
+        if k_2 is None:
+            k_2 = self.k_2
         # Convert images to LAB color space
         reference_image = cv2.cvtColor(reference_image, cv2.COLOR_RGB2LAB)
         test_image = cv2.cvtColor(test_image, cv2.COLOR_RGB2LAB)
@@ -125,10 +157,10 @@ class ColorDifferenceMetrics:
 
         # Calculate weighting factors
         L_avg = (l1 + l2) / 2
-        s_l = 1 + (k_L * k_1 * np.power((L_avg - 50),2)) / np.sqrt(20 + np.power((L_avg - 50),2))
-        s_C = 1 + k_C * k_2 * c_avg
+        s_l = 1 + ( k_2 * np.power((L_avg - 50),2)) / np.sqrt(20 + np.power((L_avg - 50),2))
+        s_C = 1 +  k_1 * c_avg
         t = 1 - 0.17 * np.cos(delta_h - math.pi/6) + 0.24 * np.cos(2 * delta_h) + 0.32 * np.cos(3 * delta_h + math.pi/30) - 0.20 * np.cos(4 * delta_h - 63 * math.pi/180)
-        s_H = 1 + k_H * k_2 * c_avg * t
+        s_H = 1 +  k_2 * c_avg * t
         r_t = -2 * np.sqrt(np.power(c_avg,7) / (np.power(c_avg,7) + 6103515625)) * np.sin((60*(math.pi/180) * np.exp(-(np.power((delta_H_p -(275*math.pi/180)) / (25*math.pi/180),2)))))
       
         # Calculate total color difference
@@ -137,7 +169,11 @@ class ColorDifferenceMetrics:
         return delta_E
 
         
-    def cmc(self, reference_image, test_image, ratio):
+    def cmc(self, reference_image, test_image, ratio=None):
+        if reference_image.shape != test_image.shape:
+            raise ValueError("Reference and test images must have the same size")
+        if ratio is None:
+            ratio = self.ratio
         # Convert images to LAB color space
         reference_image = cv2.cvtColor(reference_image, cv2.COLOR_RGB2LAB)
         test_image = cv2.cvtColor(test_image, cv2.COLOR_RGB2LAB)
@@ -173,7 +209,11 @@ class ColorDifferenceMetrics:
         return delta_E
 
 
-    def icsm(self, reference_image, test_image, ref_angle):
+    def icsm(self, reference_image, test_image, ref_angle=None):
+        if reference_image.shape != test_image.shape:
+            raise ValueError("Reference and test images must have the same size")
+        if ref_angle is None:
+            ref_angle = self.ref_angle
         # Calculate DELUV using LUV76 formula
         deluv = self.cie76_luv(reference_image, test_image)
         ref_angle = ref_angle * math.pi / 180
@@ -213,6 +253,8 @@ class ColorDifferenceMetrics:
         return diff.astype('uint8')
 
     def dergb(self, reference_image, test_image):
+        if reference_image.shape != test_image.shape:
+            raise ValueError("Reference and test images must have the same size")
         # Calculate color difference in the RGB color space
         difference = np.sum(np.square(reference_image.astype('uint8') - test_image.astype('uint8')),axis=2).astype('uint8')
         print(np.min(difference), np.max(difference))

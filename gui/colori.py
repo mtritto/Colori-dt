@@ -14,11 +14,6 @@ from gui.no_image_dialog import Ui_no_image_dialog as Ui_no_image_dialog
 from utils.neural_style_transfer import StyleTransfer
 from utils.color_difference_metrics import ColorDifferenceMetrics
 
-# Define a function to reset the images using a decorator
-
-# Define a wrapper function to open a dialog to select an image
-
-# Define functions to save the output images using a decorator
 
 class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui_no_image_dialog, QObject):
     def __init__(self):
