@@ -6,7 +6,19 @@ import matplotlib.pyplot as plt
 from PySide6.QtCore import QObject, Signal, QByteArray, QCoreApplication
 
 class StyleTransfer(QObject):
-    # Signal to update the image in the GUI
+    #Description: This class contains an implementation of the Neural Style Transfer algorithm
+    #             using the pretrained VGG19 model. The algorithm is based on the paper:
+    #             "A Neural Algorithm of Artistic Style" by Leon A. Gatys, Alexander S. Ecker, and Matthias Bethge
+    #             https://arxiv.org/abs/1508.06576
+    #             The implementation is based on the tutorials:
+    #             https://www.tensorflow.org/tutorials/generative/style_transfer
+    #             https://pytorch.org/tutorials/advanced/neural_style_tutorial.html#style-loss
+    #             and a previous implementation of the algorithm in MATLAB by the author of this code, 
+    #             based upon th
+    #
+    #
+    #
+    # Signals to update the image in the GUI
     result = Signal(np.ndarray)
     pb_progress = Signal(int)
     finished =Signal()

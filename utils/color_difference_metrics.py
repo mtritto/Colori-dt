@@ -173,8 +173,10 @@ class ColorDifferenceMetrics:
         r_t = -2 * np.sqrt(np.power(c_avg,7) / (np.power(c_avg,7) + 6103515625)) * np.sin((60*(math.pi/180) * np.exp(-(np.power((delta_H_p -(275*math.pi/180)) / (25*math.pi/180),2)))))
       
         # Calculate total color difference
-        delta_E = np.sqrt(np.power((delta_L / s_l),2) + np.power((delta_C / s_C),2) + np.power((delta_H_p / s_H),2) + r_t * (delta_C / s_C) * (delta_H_p / s_H)).astype("uint8")
+        delta_E = np.sqrt(np.power((delta_L / s_l),2) + np.power((delta_C / s_C),2) + np.power((delta_H_p / s_H),2) + r_t * (delta_C / s_C) * (delta_H_p / s_H))
 
+        # Round to nearest integer
+        delta_E = np.round(delta_E).astype("uint8")
         return delta_E
 
         
