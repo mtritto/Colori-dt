@@ -1,10 +1,11 @@
 import numpy as np
 import cv2
 import math
-from PIL import Image
+
 
 class ColorDifferenceMetrics:
-    # Description: This class contains methods for calculating color difference metrics.
+    # Description: This class contains methods for calculating color
+    #              difference metrics.
     #              The methods are based on seven color difference formulas:
     #                   L*a*b* color space:
     #                   - CIE76 (1976)
@@ -12,17 +13,25 @@ class ColorDifferenceMetrics:
     #                   - CIEDE2000 (2000)
     #                   L*u*v* color space:
     #                   - CIE76 (1976)
-    #              The RGB metric is based on the Euclidean distance between the RGB values.
-    #              The CMC metric is based on the CMC l:c (1984) color difference formula.
-    #              The ICSM metric is an original implementation of the ICSM(2022) "inverse color similarity metric" (Jaafar et al. 2022).
-    #             
-    #              The class expects images in the RGB color space, and converts them to the appropriate color space
-    #              accordingly to the selected metric before calculating the color difference.
+    #              The RGB metric is based on the Euclidean distance between
+    #              the RGB values.
+    #              The CMC metric is based on the CMC l:c (1984) color
+    #              difference formula.
+    #              The ICSM metric is an original implementation of the
+    #              ICSM(2022) "inverse color similarity metric"
+    #              (Jaafar et al. 2022).
+    #            
+    #              The class expects images in the RGB color space, and
+    #              converts them to the appropriate color space
+    #              accordingly to the selected metric before calculating the
+    #              color difference.
     #              The class expects images to be of the same size.
     #
-    # Parameters:(k_L, k_1, k_2) for ciede2000 and cie94, ratio l:c for CMC, ref_angle for ICSM
+    # Parameters:(k_L, k_1, k_2) for ciede2000 and cie94, ratio l:c for CMC,
+    #            ref_angle for ICSM
     #
-    # Returns:    grayscale image in the form of a numpy array with the same size as the input images, uint8
+    # Returns:    grayscale image in the form of a numpy array with the same 
+    #             size as the input images, uint8
     
     def __init__(self, k_L=1.0, k_1=0.045, k_2=0.015, ratio=2.0, ref_angle=30):
         self.k_L = k_L
@@ -115,7 +124,7 @@ class ColorDifferenceMetrics:
         reference_image = cv2.cvtColor(reference_image, cv2.COLOR_RGB2LAB)
         test_image = cv2.cvtColor(test_image, cv2.COLOR_RGB2LAB)
         
-        #Split LAB channels
+        # Split LAB channels
         l1, a1, b1 = cv2.split(reference_image)
         l2, a2, b2 = cv2.split(test_image)
 

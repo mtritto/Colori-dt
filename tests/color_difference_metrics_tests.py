@@ -4,6 +4,7 @@ import pytest
 import cv2
 import numpy as np
 
+
 class TestColorDifferenceMetrics():
     def test_init(self):
         # Test that the class is initialized
@@ -12,15 +13,14 @@ class TestColorDifferenceMetrics():
 
     # Tests for the cie76_lab method
     def test_cie76_lab_same_image(self):
-        # Test that the cie76_lab method returns zero if the images are identical
+        # Test that the cie76_lab method returns zero if the images are 
+        # identical
         color_difference_metrics = ColorDifferenceMetrics()
         reference_image = cv2.imread("tests/test_images/1.jpg")
         test_image = cv2.imread("tests/test_images/1.jpg")
         deltaE = color_difference_metrics.cie76_lab(reference_image, test_image)
         # Assert that the deltaE is zero for all pixels
         assert deltaE == np.zeros_like(reference_image[:,:,0])
-
-    
 
     def test_cie76_luv_same_image(self):
         # Test that the cie76_luv method returns zero if the images are identical
