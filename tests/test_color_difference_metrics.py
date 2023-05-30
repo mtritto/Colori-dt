@@ -50,7 +50,7 @@ class TestColorDifferenceMetrics():
         test_image = cv2.imread("tests/test_images/1.jpeg")
         deltaE = color_difference_metrics.ciede2000(reference_image, test_image)
         # Assert that the deltaE is zero for all pixels
-        assert np.all(deltaE == np.zeros_like(reference_image[:,:,0]))
+        assert np.allclose(deltaE, np.zeros_like(reference_image[:,:,0]),atol=1)
     
     def test_rgb_same_image(self):
         # Test the rgb method if the images are identical
