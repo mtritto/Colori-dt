@@ -13,6 +13,7 @@ from gui.about_dialog import Ui_Dialog as Ui_Dialog_about
 from gui.no_image_dialog import Ui_no_image_dialog as Ui_no_image_dialog
 from utils.neural_style_transfer import StyleTransfer
 from utils.color_difference_metrics import ColorDifferenceMetrics
+import imageio
 
 
 class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui_no_image_dialog, QObject):
@@ -99,11 +100,17 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
         if sender == self.pb_ref_select:
             self.reference_image = image
             self.gv_ref_img.setScene(scene)
+            # Set the image size labels
+            self.la_ref_h.setText(str(image.shape[0]) + 'px')
+            self.la_ref_w.setText(str(image.shape[1]) + 'px')
         elif sender == self.pb_test_select:
             self.test_image = image
             self.gv_test_img.setScene(scene)
+            # Set the image size labels
+            self.la_test_h.setText(str(image.shape[0]) + 'px')
+            self.la_test_w.setText(str(image.shape[1])+ 'px')
         # Enable the transfer button if both images are selected
-        if self.reference_image is not None and self.test_image is not None:
+        if np.all(self.reference_image != None) and np.all(self.test_image != None):
             self.pb_transfer.setEnabled(True)
             self.pb_diff_calc.setEnabled(True)
         else:
@@ -119,14 +126,10 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
 
         if sender == self.pb_export_diff:
             out_image = self.diff_output_image
-            image =Image.fromarray(out_image)
-            qimage = QImage(image.tobytes(), image.size[0], image.size[1],  
-                 QImage.Format.Format_RGB888)
+
         elif sender == self.pb_export_transfer:
-            out_image = self.transf_output_image
-            image =Image.fromarray(out_image)
-            qimage = QImage(image.tobytes(), image.size[0], image.size[1],  
-                 QImage.Format.Format_Grayscale8)
+            out_image = self.transf_output_image    
+
         else:
             out_image = None
         
@@ -138,10 +141,12 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
             self.no_image_dialog.show()
             self.no_image_ui.pb_cancel.clicked.connect(self.no_image_dialog.close)
         else:
-            pixmap = QPixmap.fromImage(qimage)
+            #pixmap = QPixmap.fromImage(self.diff_output_image)
+            image =Image.fromarray(out_image)
             filename, _ = QFileDialog.getSaveFileName(self, 'Save File', '', 'Images (*.png)')
             if filename != '':
-                pixmap.save(filename, 'PNG')
+                image.save(filename, 'TIFF')
+                #imageio.imwrite(filename, out_image, format='tiff')
 
     def reset_reference_image(self):
         self.reference_image_path = None
@@ -149,6 +154,8 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
         self.gv_ref_img.setScene(None)
         self.enable_transfer()
         self.enable_diff_calc()
+        self.la_ref_h.setText('')
+        self.la_ref_w.setText('')
 
     def reset_test_image(self):
         self.test_image_path = None
@@ -156,6 +163,8 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
         self.gv_test_img.setScene(None)
         self.enable_transfer()
         self.enable_diff_calc()
+        self.la_test_h.setText('')
+        self.la_test_w.setText('')
 
     def reset_transf_image(self):
         self.output_transf_image = None
@@ -163,6 +172,7 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
         self.prog_epoch.setValue(0)
         self.la_progress.setText('')
         self.cancel_transfer()
+
 
     def reset_diff_image(self):
         self.output_diff_image = None
@@ -255,7 +265,6 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
                 self.get_color_difference(self.reference_image, self.test_image)
             
 
-
     def get_color_difference(self, reference_image, test_image):
         # Define a dictionary with the metrics and the corresponding functions
         metrics = {
@@ -294,15 +303,6 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
         self.nst_thread.finished.connect(self.nst_thread.quit)
         self.nst_thread.finished.connect(self.on_transfer_finished)
         QTimer.singleShot(0, self.nst_thread.start)
-        #if self.pb_transfer.isEnabled:
-        #    self.nst.moveToThread(self.nst_thread)
-        #    self.nst_thread.started.connect(lambda: self.nst.run(self.reference_image, self.test_image))
-        #    self.pb_transfer.setEnabled(False)
-        #    self.nst_thread.finished.connect(self.nst_thread.quit)
-        #    QTimer.singleShot(0, self.nst_thread.start)
-        #    self.nst_thread.finished.connect(lambda: self.pb_transfer.clicked.connect(self.execute_style_transfer))
-        #    self.pb_transfer.setEnabled(True)
-        #    #self.nst_thread.start()
     
     def update_transf_image(self, bytearr):
         image_from_bytes = np.frombuffer(bytearr.data(), dtype=np.uint8).reshape(224,224,3)
@@ -327,11 +327,13 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
         self.prog_epoch.update()
 
     def on_transfer_finished(self):
-        self.tranfer_running = False
+        self.transfer_running = False
         self.pb_transfer.setEnabled(True)
 
     def cancel_transfer(self):
         self.transfer_canceled = True
+        if self.transfer_running:
+            self.nst.cancel()
 
 def main():
     app = QApplication(['Colori-DT'])
