@@ -13,7 +13,6 @@ from gui.about_dialog import Ui_Dialog as Ui_Dialog_about
 from gui.no_image_dialog import Ui_no_image_dialog as Ui_no_image_dialog
 from utils.neural_style_transfer import StyleTransfer
 from utils.color_difference_metrics import ColorDifferenceMetrics
-import imageio
 
 
 class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui_no_image_dialog, QObject):
@@ -21,7 +20,6 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
         super(Gui, self).__init__()
         self.setupUi(self)
         self.show()
-
         self.nst = StyleTransfer()
         self.cdm = ColorDifferenceMetrics()
         self.selected_metric = self.cb_metrics.currentText()
@@ -43,6 +41,7 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
         self.pb_export_transfer.clicked.connect(self.save_image)
         self.actionAbout.triggered.connect(self.open_about)
         self.actionExit.triggered.connect(self.close)
+        self.prog_epoch.setMaximum(self.nst.epochs-1)
         self.pb_transfer.setEnabled(False)
         self.pb_diff_calc.setEnabled(False)
         self.actionHelp.triggered.connect(self.open_pdf)
@@ -56,14 +55,13 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
         self.cb_metrics.currentIndexChanged.connect(self.select_metric)
         self.scene = QGraphicsScene()
         self.gv_transf_out.setScene(self.scene)
-        self.transfer_running = False
+        #self.transfer_running = False
         self.transfer_canceled = False
 
-        # Connect signals and slots for the neural style transfer 
-        self.nst.result.connect(self.update_transf_image)
-        self.nst.pb_progress.connect(self.update_progress)
-        # Initialize the thread for the neural style transfer
-        self.nst_thread = QThread()
+        # Connect signals and slots for the neural style transfer
+        #self.nst_thread = QThread()
+  
+
 
     ## Gui function to open about dialog
     def open_about(self):
@@ -75,7 +73,7 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
     def select_image(self, image_path):
         self.select_dialog = QFileDialog()
         self.select_dialog.setFileMode(QFileDialog.FileMode.ExistingFile)
-        self.select_dialog.setNameFilter('Images (*.png *.jpg *.jpeg *.tiff *.tif)')
+        self.select_dialog.setNameFilter('Images (*.jpg *.jpeg *.tiff *.tif)')
         self.select_dialog.show()
         if self.select_dialog.exec():
             image_path = self.select_dialog.selectedFiles()[0]
@@ -143,7 +141,7 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
         else:
             #pixmap = QPixmap.fromImage(self.diff_output_image)
             image =Image.fromarray(out_image)
-            filename, _ = QFileDialog.getSaveFileName(self, 'Save File', '', 'Images (*.png)')
+            filename, _ = QFileDialog.getSaveFileName(self, 'Save File', '', 'Images (*.tiff)')
             if filename != '':
                 image.save(filename, 'TIFF')
                 #imageio.imwrite(filename, out_image, format='tiff')
@@ -291,20 +289,44 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
     ## Neural style transfer
     # Assign the transfer to a separate thread to avoid blocking the GUI and to show progresses while running
 
+    def execute_style_transfer_2(self):
+        self.pb_transfer.setEnabled(False)
+        self.pb_reset_transfer.setEnabled(False)
+        self.nst_thread = QThread()
+        self.nst.moveToThread(self.nst_thread)
+        self.nst.finished.connect(self.nst_thread.quit)
+        self.nst.finished.connect(self.nst.deleteLater)
+        self.nst_thread.started.connect(lambda: self.nst.run(self.reference_image, self.test_image))
+        self.nst.result.connect(self.update_transf_image)
+        self.nst.pb_progress.connect(self.update_progress)
+        self.nst_thread.finished.connect(lambda: self.on_transfer_finished())
+        self.nst_thread.finished.connect(self.nst_thread.deleteLater)
+        self.nst_thread.finished.connect(self.nst.deleteLater)
+        self.nst_thread.start()
+
     def execute_style_transfer(self):
-        print('Executing')
-        if self.transfer_running:
-            return
-        self.transfer_running = True
+        # Disable the transfer buttons
         self.transfer_canceled = False
         self.pb_transfer.setEnabled(False)
+        self.pb_reset_transfer.setEnabled(False)
+
+        self.nst_thread = QThread()
+
+        # Move the NST object to the thread
         self.nst.moveToThread(self.nst_thread)
+
+        # Connect signals and slots
+        self.nst.finished.connect(self.on_transfer_finished)
+        self.nst.finished.connect(self.nst.deleteLater)
         self.nst_thread.started.connect(lambda: self.nst.run(self.reference_image, self.test_image))
-        self.nst_thread.finished.connect(self.nst_thread.quit)
-        self.nst_thread.finished.connect(self.on_transfer_finished)
-        QTimer.singleShot(0, self.nst_thread.start)
+        self.nst.result.connect(self.update_transf_image)
+        self.nst.pb_progress.connect(self.update_progress)
+
+        # Start the thread
+        self.nst_thread.start()
     
     def update_transf_image(self, bytearr):
+        # Integrate: reshapa with same size as the input image
         image_from_bytes = np.frombuffer(bytearr.data(), dtype=np.uint8).reshape(224,224,3)
         self.transf_output_image = image_from_bytes
         qimage = QImage(image_from_bytes, image_from_bytes.shape[1], image_from_bytes.shape[0], QImage.Format.Format_RGB888)
@@ -316,24 +338,41 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
         self.gv_transf_out.viewport().update()
     
     def update_progress(self, progress):
+        # Progress range is 0-9
+        self.prog_epoch.setValue(0)
         if self.transfer_canceled:
             return
         self.prog_epoch.setValue(progress)
-        if progress <9:
+        if progress < self.nst.epochs-1:
             self.la_progress.setText(str(progress+1))
         else:
             self.la_progress.setText('Transfer complete')
+
         self.prog_epoch.repaint()
         self.prog_epoch.update()
 
-    def on_transfer_finished(self):
-        self.transfer_running = False
-        self.pb_transfer.setEnabled(True)
 
+    def on_transfer_finished(self):
+        # Disconnect signals and slots
+        self.nst.finished.disconnect(self.on_transfer_finished)
+        self.nst.result.disconnect(self.update_transf_image)
+        self.nst.pb_progress.disconnect(self.update_progress)
+
+        # Move the NST object back to the main thread
+        #self.nst.moveToThread(QCoreApplication.instance().thread())
+
+        # Clean up the thread object
+        self.nst_thread.quit()
+        self.nst_thread.wait()
+        self.nst_thread.deleteLater()
+
+        # Re-enable the transfer buttons
+        self.pb_transfer.setEnabled(True)
+        self.pb_reset_transfer.setEnabled(True)
+    
     def cancel_transfer(self):
         self.transfer_canceled = True
-        if self.transfer_running:
-            self.nst.cancel()
+        
 
 def main():
     app = QApplication(['Colori-DT'])

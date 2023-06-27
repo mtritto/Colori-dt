@@ -3,7 +3,7 @@ import numpy as np
 from PIL import Image
 from time import time
 import matplotlib.pyplot as plt
-from PySide6.QtCore import QObject, Signal, QByteArray, QCoreApplication
+from PySide6.QtCore import QObject, Signal, QByteArray, QCoreApplication, QThread
 import cv2
 
 class StyleTransfer(QObject):
@@ -22,7 +22,7 @@ class StyleTransfer(QObject):
     # Signals to update the image in the GUI
     result = Signal(np.ndarray)
     pb_progress = Signal(int)
-    finished =Signal()
+    finished = Signal()
 
     def __init__(self):
         super().__init__()
@@ -35,7 +35,8 @@ class StyleTransfer(QObject):
                                 'block3_conv1',
                                 'block4_conv1',
                                 'block5_conv1']
-        self.total_variation_weight = 50
+        self.total_variation_weight = 45
+        self.epochs = 10
         
     def preprocess_image_neural(self, image):
         # Preprocess image for VGG19
@@ -120,8 +121,11 @@ class StyleTransfer(QObject):
     def run(self, content_image, style_image):
         #content_image = self.load_img(self.content_path)
         #style_image = self.load_img(self.style_path)
-        epochs=10
-        steps_per_epoch=100
+        #epochs=10
+        # settings to try threading
+        epochs = self.epochs
+        steps_per_epoch = 250
+        #steps_per_epoch=350
         content_layers = self.content_layers
         style_layers = self.style_layers
 
@@ -135,7 +139,7 @@ class StyleTransfer(QObject):
 
         opt = tf.optimizers.legacy.Adam(learning_rate=0.05, beta_1=0.99, epsilon=1e-1)
 
-        style_weight = 1e-2
+        style_weight = 1e-1
         content_weight = 1e4
 
         def compute_loss(outputs):
@@ -176,4 +180,6 @@ class StyleTransfer(QObject):
             self.result.emit(byte_array)
             self.pb_progress.emit(n)
         self.finished.emit()
+
+        
 
