@@ -192,11 +192,11 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
     def open_pdf(self):
         # Open tjhe documentation pdf according to the OS
         if sys.platform.startswith('darwin'):
-            subprocess.call(('open', '.gui/resources/Colori-DT.pdf'))
+            subprocess.call(('open', 'gui/resources/Colori-DT.pdf'))
         elif sys.platform.startswith('cygwin'):
-            os.startfile('.gui/resources/Colori-DT.pdf')
+            os.startfile('gui/resources/Colori-DT.pdf')
         elif os.name == 'posix':
-            subprocess.call(('xdg-open', '.gui/resources/Colori-DT.pdf'))
+            subprocess.call(('xdg-open', 'gui/resources/Colori-DT.pdf'))
 
     def enable_transfer(self):
         if np.all(self.reference_image != None) and np.all(self.test_image != None):
@@ -289,26 +289,12 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
     ## Neural style transfer
     # Assign the transfer to a separate thread to avoid blocking the GUI and to show progresses while running
 
-    def execute_style_transfer_2(self):
-        self.pb_transfer.setEnabled(False)
-        self.pb_reset_transfer.setEnabled(False)
-        self.nst_thread = QThread()
-        self.nst.moveToThread(self.nst_thread)
-        self.nst.finished.connect(self.nst_thread.quit)
-        self.nst.finished.connect(self.nst.deleteLater)
-        self.nst_thread.started.connect(lambda: self.nst.run(self.reference_image, self.test_image))
-        self.nst.result.connect(self.update_transf_image)
-        self.nst.pb_progress.connect(self.update_progress)
-        self.nst_thread.finished.connect(lambda: self.on_transfer_finished())
-        self.nst_thread.finished.connect(self.nst_thread.deleteLater)
-        self.nst_thread.finished.connect(self.nst.deleteLater)
-        self.nst_thread.start()
-
     def execute_style_transfer(self):
         # Disable the transfer buttons
         self.transfer_canceled = False
         self.pb_transfer.setEnabled(False)
         self.pb_reset_transfer.setEnabled(False)
+        self.pb_export_transfer.setEnabled(False)
 
         self.nst_thread = QThread()
 
@@ -326,10 +312,13 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
         self.nst_thread.start()
     
     def update_transf_image(self, bytearr):
-        # Integrate: reshapa with same size as the input image
         image_from_bytes = np.frombuffer(bytearr.data(), dtype=np.uint8).reshape(224,224,3)
+        # resize image to graphics view size for export
+
         self.transf_output_image = image_from_bytes
         qimage = QImage(image_from_bytes, image_from_bytes.shape[1], image_from_bytes.shape[0], QImage.Format.Format_RGB888)
+        # resize image to fit in the graphics view
+        qimage = qimage.scaled(371, 331)
         pixmap = QPixmap.fromImage(qimage)
         item = QGraphicsPixmapItem(pixmap)
         self.scene.clear()
@@ -369,6 +358,7 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
         # Re-enable the transfer buttons
         self.pb_transfer.setEnabled(True)
         self.pb_reset_transfer.setEnabled(True)
+        self.pb_export_transfer.setEnabled(True)
     
     def cancel_transfer(self):
         self.transfer_canceled = True

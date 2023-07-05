@@ -2,7 +2,6 @@ import tensorflow as tf
 import numpy as np
 from PIL import Image
 from time import time
-import matplotlib.pyplot as plt
 from PySide6.QtCore import QObject, Signal, QByteArray, QCoreApplication, QThread
 import cv2
 
@@ -26,8 +25,6 @@ class StyleTransfer(QObject):
 
     def __init__(self):
         super().__init__()
-        self.content_image_path = None
-        self.style_image_path = None
         self.output_image = None
         self.content_layers = ['block5_conv2']
         self.style_layers = ['block1_conv1',
@@ -119,13 +116,10 @@ class StyleTransfer(QObject):
     #def transfer_style(self, content_image, style_image):
     
     def run(self, content_image, style_image):
-        #content_image = self.load_img(self.content_path)
-        #style_image = self.load_img(self.style_path)
-        #epochs=10
-        # settings to try threading
+    
         epochs = self.epochs
-        steps_per_epoch = 250
-        #steps_per_epoch=350
+        steps_per_epoch = 200
+        
         content_layers = self.content_layers
         style_layers = self.style_layers
 
@@ -161,7 +155,7 @@ class StyleTransfer(QObject):
             with tf.GradientTape() as tape:
                 outputs = extractor(image)
                 loss, style_loss, content_loss = compute_loss(outputs)
-                loss += self.total_variation_weight * tf.image.total_variation(image)
+                loss = loss + self.total_variation_weight * tf.image.total_variation(image)
 
                 print("Style loss: {}".format(style_loss), "Content loss: {}".format(content_loss), end="\r")
 
