@@ -43,10 +43,13 @@ class StyleTransfer(QObject):
         image = image[tf.newaxis, :]
         return image
     
-    def deprocess_image_neural(self, processed_img):
+    def deprocess_image_neural(self, processed_img, content_image_aspect_ratio):
         # Deprocess image for presentation
         image = processed_img.copy()
-        image = np.array(image).reshape((224, 224, 3))
+        if content_image_aspect_ratio>1:
+            image = np.array(image).reshape((224, int(224*content_image_aspect_ratio), 3))
+        else:
+            image = np.array(image).reshape((224*int(content_image_aspect_ratio), 224, 3))
         # Add mean values of VGG19 input layer
         image[:, :, 0] += 103.939
         image[:, :, 1] += 116.779
@@ -54,7 +57,7 @@ class StyleTransfer(QObject):
         image = image[:, :, ::-1]
         # Equalize histogram to desaturate pure colors
         hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
-        hsv[:, :, 1] = hsv[:, :, 1] * 0.9
+        #hsv[:, :, 1] = hsv[:, :, 1] * 0.9
         image = cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
         image = np.clip(image, 0, 255).astype('uint8')
 
@@ -118,7 +121,7 @@ class StyleTransfer(QObject):
     def run(self, content_image, style_image):
     
         epochs = self.epochs
-        steps_per_epoch = 200
+        steps_per_epoch = 400
         
         content_layers = self.content_layers
         style_layers = self.style_layers
@@ -131,10 +134,10 @@ class StyleTransfer(QObject):
         style_targets = extractor(style_image)['style']
         content_targets = extractor(content_image)['content']
 
-        opt = tf.optimizers.legacy.Adam(learning_rate=0.05, beta_1=0.99, epsilon=1e-1)
+        opt = tf.optimizers.legacy.Adam(learning_rate=0.02, beta_1=0.99, epsilon=1e-1)
 
-        style_weight = 1e-1
-        content_weight = 1e4
+        style_weight = 1e3
+        content_weight = 1
 
         def compute_loss(outputs):
             style_outputs = outputs['style']
@@ -154,22 +157,32 @@ class StyleTransfer(QObject):
         def train_step(image):
             with tf.GradientTape() as tape:
                 outputs = extractor(image)
-                loss, style_loss, content_loss = compute_loss(outputs)
-                loss = loss + self.total_variation_weight * tf.image.total_variation(image)
+                loss = compute_loss(outputs)
+                # Apply total variation loss
+                loss += self.total_variation_weight * tf.image.total_variation(image)
 
-                print("Style loss: {}".format(style_loss), "Content loss: {}".format(content_loss), end="\r")
+                #print("Style loss: {}".format(style_loss), "Content loss: {}".format(content_loss), end="\r")
 
             grad = tape.gradient(loss, image)
             opt.apply_gradients([(grad, image)])
 
         # Training loop
         image = tf.Variable(content_image)
+        
+        # Get aspect ratio of content image
+        aspect_ratio = content_image.shape[2]/content_image.shape[1]
+
+        noise = tf.Variable(tf.random.uniform(content_image.shape, 0, 68))
+        # mean between image and noise to start with a random image
+        image = tf.Variable((0.8*image + noise) / 2)
+
 
         for n in range(epochs):
             for m in range(steps_per_epoch):
                 train_step(image)
                 QCoreApplication.processEvents()
-            self.output_image = self.deprocess_image_neural(image.numpy())
+            self.output_image = self.deprocess_image_neural(image.numpy(), aspect_ratio)
+
             byte_array = QByteArray(self.output_image.tobytes())
             self.result.emit(byte_array)
             self.pb_progress.emit(n)

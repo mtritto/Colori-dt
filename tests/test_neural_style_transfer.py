@@ -18,7 +18,7 @@ def test_preprocess_image_neural(style_transfer):
 def test_deprocess_image_neural(style_transfer):
     # Test if the deprocess_image_neural method returns the expected output
     processed_image = np.random.rand(1, 224, 224, 3)
-    deprocessed_image = style_transfer.deprocess_image_neural(processed_image)
+    deprocessed_image = style_transfer.deprocess_image_neural(processed_image,1)
     assert deprocessed_image.shape == (224, 224, 3)
 
 

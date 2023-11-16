@@ -55,15 +55,11 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
         self.cb_metrics.currentIndexChanged.connect(self.select_metric)
         self.scene = QGraphicsScene()
         self.gv_transf_out.setScene(self.scene)
-        #self.transfer_running = False
         self.transfer_canceled = False
+        # force interrupt of any running threads when closing the gui
+       
+    
 
-        # Connect signals and slots for the neural style transfer
-        #self.nst_thread = QThread()
-  
-
-
-    ## Gui function to open about dialog
     def open_about(self):
         self.about_dialog = QDialog()
         self.dialog_ui = Ui_Dialog_about()
@@ -87,7 +83,8 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
         image = image.astype('uint8')
         # Show image in the gui
         scene = QGraphicsScene()
-        qimage = QImage(image, image.shape[1], image.shape[0], QImage.Format.Format_RGB888)
+        #qimage = QImage(image, image.shape[1], image.shape[0], QImage.Format.Format_RGB888)
+        qimage = QImage(image, image.shape[1], image.shape[0], QImage.Format.Format_RGBA8888_Premultiplied)
         # Resize image to fit in the graphics view
         qimage = qimage.scaled(191, 181)
         pixmap = QPixmap.fromImage(qimage)
@@ -369,14 +366,7 @@ def main():
     QCoreApplication.setApplicationName('Colori-DT')
     icon = QIcon('gui/resources/icon.png')
     app.setWindowIcon(icon)
-    pixmap = QPixmap('gui/resources/splash.jpg')
-    splash = QSplashScreen(pixmap)
-    splash.setMask(pixmap.mask())
-    splash.show()
-    sleep(2)
-    app.processEvents()  
     gui = Gui()
     gui.show()
-    splash.close()
     sys.exit(app.exec())
 
