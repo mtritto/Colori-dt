@@ -2,6 +2,7 @@
 .DS_Store
 Colori-dt.code-workspace
 .pytest_cache
+__pycache__/
 .vscode
 venv/
 ```

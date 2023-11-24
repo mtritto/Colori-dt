@@ -11,8 +11,8 @@ from gui.gui import Ui_MainWindow
 from gui.shape_error_dialog import Ui_Dialog as Ui_Dialog_shape_error
 from gui.about_dialog import Ui_Dialog as Ui_Dialog_about
 from gui.no_image_dialog import Ui_no_image_dialog as Ui_no_image_dialog
-from utils.neural_style_transfer import StyleTransfer
-from utils.color_difference_metrics import ColorDifferenceMetrics
+from utils.neural_style_transfer import NeuralStyleTransfer
+from utils.color_difference_metrics import cie76_lab, cie76_luv, cie94, ciede2000, dergb, cmc, icsm
 
 
 class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui_no_image_dialog, QObject):
@@ -20,8 +20,7 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
         super(Gui, self).__init__()
         self.setupUi(self)
         self.show()
-        self.nst = StyleTransfer()
-        self.cdm = ColorDifferenceMetrics()
+        self.nst = NeuralStyleTransfer()
         self.selected_metric = self.cb_metrics.currentText()
         self.reference_image_path = None
         self.test_image_path = None
@@ -58,7 +57,6 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
         self.transfer_canceled = False
         # force interrupt of any running threads when closing the gui
        
-    
 
     def open_about(self):
         self.about_dialog = QDialog()
@@ -76,15 +74,18 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
         else:
             image_path = None
         image = Image.open(image_path)
-        if image_path.endswith('.tiff'):
-                image = image.convert('RGB')
+        # Check if the image has an alpha channel
+        if image.mode == 'RGBA':
+            # Convert the image to RGB if it has an alpha channel
+            image = image.convert('RGB')
             # Convert image to numpy array ans set data type to uint8 
         image = np.array(image)
+        image_displayed = image
         image = image.astype('uint8')
         # Show image in the gui
         scene = QGraphicsScene()
-        #qimage = QImage(image, image.shape[1], image.shape[0], QImage.Format.Format_RGB888)
-        qimage = QImage(image, image.shape[1], image.shape[0], QImage.Format.Format_RGBA8888_Premultiplied)
+        qimage = QImage(image_displayed, image.shape[1], image.shape[0], QImage.Format.Format_RGB888)
+        #qimage = QImage(image, image.shape[1], image.shape[0], ) #, QImage.Format.Format_RGBA8888_Premultiplied)
         # Resize image to fit in the graphics view
         qimage = qimage.scaled(191, 181)
         pixmap = QPixmap.fromImage(qimage)
@@ -213,24 +214,27 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
         k1 = self.sb_k1_00.value()
         k2 = self.sb_k2_00.value()
         kL = self.sb_kL_00.value()
-        result = self.cdm.ciede2000(reference_image, test_image, k1, k2, kL)
+        result = ciede2000(reference_image, test_image, k1, k2, kL)
+
         return result
     
     def calc_76lab(self, reference_image, test_image):
         # No parameters to set
-        result = self.cdm.cie76_lab(reference_image, test_image)
+        result = cie76_lab(reference_image, test_image)
+
         return result
 
     def calc_76luv(self, reference_image, test_image):
         # No parameters to set
-        result = self.cdm.cie76_luv(reference_image, test_image)
+        result = cie76_luv(reference_image, test_image)
         return result
 
     def calc_94lab(self, reference_image, test_image):
         k1 = self.sb_k1_94.value()
         k2 = self.sb_k2_94.value()
         kL = self.sb_kL_94.value()
-        result = self.cdm.cie94(reference_image, test_image, k1, k2, kL)
+        result = cie94(reference_image, test_image, k1, k2, kL)
+
         return result
     
     def calc_cmc(self, reference_image, test_image):
@@ -239,16 +243,16 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
         if self.cb_ratio.currentText().startswith('2'):
             ratio = 2
         
-        result = self.cdm.cmc(reference_image, test_image, ratio)
+        result = cmc(reference_image, test_image, ratio)
         return result
 
     def calc_icsm(self, reference_image, test_image):
         ref = self.sb_ang.value()
-        result = self.cdm.icsm(reference_image, test_image, ref)
+        result = icsm(reference_image, test_image, ref)
         return result
 
     def calc_rgb(self, reference_image, test_image):
-        result = self.cdm.dergb(reference_image, test_image)
+        result = dergb(reference_image, test_image)
         return result
 
     def select_metric(self):
