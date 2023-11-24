@@ -1,24 +1,42 @@
 import tensorflow as tf
 import numpy as np
-from PIL import Image
 from time import time
 from PySide6.QtCore import QObject, Signal, QByteArray, QCoreApplication, QThread
 import cv2
 
-class StyleTransfer(QObject):
-    #Description: This class contains an implementation of the Neural Style Transfer algorithm
-    #             using the pretrained VGG19 model. The algorithm is based on the paper:
-    #             "A Neural Algorithm of Artistic Style" by Leon A. Gatys, Alexander S. Ecker, and Matthias Bethge
-    #             https://arxiv.org/abs/1508.06576
-    #             The implementation is based on the tutorials:
-    #             https://www.tensorflow.org/tutorials/generative/style_transfer
-    #             https://pytorch.org/tutorials/advanced/neural_style_tutorial.html#style-loss
-    #             and a previous implementation of the algorithm in MATLAB by the author of this code, 
-    #             based upon th
-    #
-    #
-    #
-    # Signals to update the image in the GUI
+class NeuralStyleTransfer(QObject):
+    
+    """ 
+    This class contains an implementation of the Neural Style Transfer algorithm
+    using the pretrained VGG19 model. The algorithm is based on the paper:
+    "A Neural Algorithm of Artistic Style" by Leon A. Gatys, Alexander S. Ecker, and Matthias Bethge
+    https://arxiv.org/abs/1508.06576
+
+    The implementation is based on the tutorials:
+    https://www.tensorflow.org/tutorials/generative/style_transfer
+    https://pytorch.org/tutorials/advanced/neural_style_tutorial.html#style-loss
+    and a previous implementation of the algorithm in MATLAB by the author of this code.
+
+    Methods
+    -------
+    preprocess_image_neural(image)
+        Preprocess image for VGG19, resizing it to (224,224,3).
+    deprocess_image_neural(processed_img, content_image_aspect_ratio)
+        Deprocess VGG19 output tensor to image ndarray, reshaping 
+        the result to the original aspect ratio of the content image.
+    gram_matrix(input_tensor)
+        Compute the Gram matrix of the input tensor.
+    vgg_layers(layer_names)
+        Create a model from VGG19 with specified VGG19 layer_names.
+    style_transfer_model(style_layers, content_layers)
+        Create the style transfer model from VGG19, with specified style and content layers,
+        using vgg_layers and calculating the Gram matrix for the style output
+    compute_loss(outputs)
+        Compute the total loss, style loss, and content loss.
+    run(content_image, style_image, epochs = 10, steps_per_epoch = 400)
+        Run the Neural Style Transfer algorithm.
+    """
+
     result = Signal(np.ndarray)
     pb_progress = Signal(int)
     finished = Signal()
@@ -34,8 +52,23 @@ class StyleTransfer(QObject):
                                 'block5_conv1']
         self.total_variation_weight = 45
         self.epochs = 10
+        self.style_weight = 1e3
+        self.content_weight = 1
+        self.style_targets = None
+        self.content_targets = None
         
     def preprocess_image_neural(self, image):
+        """
+        Preprocess image for VGG19, resizing it to (224,224,3).
+
+        Parameters
+        ----------
+            image (numpy.ndarray): Input image.
+
+        Return
+        ------
+            tensorflow.Tensor: Preprocessed image for VGG19 with shape (244,244,3).
+        """
         # Preprocess image for VGG19
         image = tf.keras.applications.vgg19.preprocess_input(image)
         image = image.copy()
@@ -44,6 +77,18 @@ class StyleTransfer(QObject):
         return image
     
     def deprocess_image_neural(self, processed_img, content_image_aspect_ratio):
+        """
+        Deprocess image for presentation, reshaping the result to the original aspect ratio of the content image.
+ 
+        Parameters
+        ----------
+            processed_img (numpy.ndarray): Processed image.
+            content_image_aspect_ratio (float): Aspect ratio of the content image.
+
+        Return
+        ------
+            numpy.ndarray: Deprocessed image for presentation as uint8 ndarray.
+        """
         # Deprocess image for presentation
         image = processed_img.copy()
         if content_image_aspect_ratio>1:
@@ -57,114 +102,145 @@ class StyleTransfer(QObject):
         image = image[:, :, ::-1]
         # Equalize histogram to desaturate pure colors
         hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
-        #hsv[:, :, 1] = hsv[:, :, 1] * 0.9
         image = cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
         image = np.clip(image, 0, 255).astype('uint8')
-
-
         return image
 
+    def gram_matrix(self, input_tensor):
+        """
+        Calculate the Gram matrix of the input tensor.
+
+        Parameters
+        ----------
+            input_tensor (tensorflow.Tensor): Input tensor.
+
+        Return
+        ------
+            tensorflow.Tensor: Gram matrix.
+        """
+        result = tf.linalg.einsum('bijc,bijd->bcd', input_tensor, input_tensor)
+        input_shape = tf.shape(input_tensor)
+        num_locations = tf.cast(input_shape[1]*input_shape[2], tf.float32)
+        return result/(num_locations)
 
     def vgg_layers(self, layer_names):
+        """
+        Create a model from VGG19 with specified VGG19 layer_names.
+
+        Parameters
+        ----------
+            layer_names (list): List of layer names.
+
+        Return
+        ------
+            tensorflow.keras.Model: VGG model with specified layers.
+        """
         vgg = tf.keras.applications.VGG19(include_top=False, weights='imagenet')
         vgg.trainable = False
 
         outputs = [vgg.get_layer(name).output for name in layer_names]
         model = tf.keras.Model([vgg.input], outputs)
         return model
+    
+    def style_transfer_model(self, style_layers, content_layers):
+        """
+        Create the style transfer model from VGG19, with specified style and content layers,
+        using vgg_layers(layer_names) and applying gram_matrix(input_tensor) to the style layers.
 
-    def gram_matrix(self, input_tensor):
-        result = tf.linalg.einsum('bijc,bijd->bcd', input_tensor, input_tensor)
-        input_shape = tf.shape(input_tensor)
-        num_locations = tf.cast(input_shape[1]*input_shape[2], tf.float32)
-        return result/(num_locations)
+        Parameters
+        ----------
+            style_layers (list): List of style layers.
+            content_layers (list): List of content layers.
 
-    class StyleContentModel(tf.keras.models.Model):
-        def __init__(self, style_layers, content_layers):
-            super(StyleTransfer.StyleContentModel, self).__init__()
-            self.vgg = self.vgg_layers(style_layers + content_layers)
-            self.style_layers = style_layers
-            self.content_layers = content_layers
-            self.num_style_layers = len(style_layers)
-            self.vgg.trainable = False
+        Return
+        ------
+            function: Style transfer model.
+        """
+        vgg = self.vgg_layers(style_layers + content_layers)
+        num_style_layers = len(style_layers)
+        vgg.trainable = False
 
-        def vgg_layers(self, layer_names):
-            vgg = tf.keras.applications.VGG19(include_top=False, weights='imagenet')
-            vgg.trainable = False
-
-            outputs = [vgg.get_layer(name).output for name in layer_names]
-            model = tf.keras.Model([vgg.input], outputs)
-            return model
-
-        def call(self, inputs):
+        def model(inputs):
             inputs = inputs * 255.0
             preprocessed_input = tf.keras.applications.vgg19.preprocess_input(inputs)
-            outputs = self.vgg(preprocessed_input)
-            style_outputs, content_outputs = (outputs[:self.num_style_layers], 
-                                              outputs[self.num_style_layers:])
+            outputs = vgg(preprocessed_input)
+            style_outputs, content_outputs = (outputs[:num_style_layers], outputs[num_style_layers:])
 
-            style_outputs = [StyleTransfer.gram_matrix(self, style_output)
-                             for style_output in style_outputs]
+            style_outputs = [self.gram_matrix(style_output) for style_output in style_outputs]
 
             content_dict = {content_name: value
                             for content_name, value
-                            in zip(self.content_layers, content_outputs)}
+                            in zip(content_layers, content_outputs)}
 
             style_dict = {style_name: value
-                          for style_name, value
-                          in zip(self.style_layers, style_outputs)}
+                            for style_name, value
+                            in zip(style_layers, style_outputs)}
 
             return {'content': content_dict, 'style': style_dict}
 
-    #def transfer_style(self, content_image, style_image):
+        return model
     
-    def run(self, content_image, style_image):
-    
-        epochs = self.epochs
-        steps_per_epoch = 400
+    def compute_loss(self, outputs):
+        """
+        Compute the total loss, style loss, and content loss.
+
+        Parameters
+        ----------
+            outputs (dict): Dictionary containing style and content outputs.
+
+        Return
+        ------
+            tuple: Total loss, style loss, and content loss.
+        """
+        style_outputs = outputs['style']
+        content_outputs = outputs['content']
+
+        style_loss = tf.add_n([tf.reduce_mean((style_outputs[name] - self.style_targets[name]) ** 2) 
+                                for name in style_outputs.keys()])
+        style_loss *= self.style_weight / len(self.style_layers)
+
+        content_loss = tf.add_n([tf.reduce_mean((content_outputs[name] - self.content_targets[name]) ** 2) 
+                                    for name in content_outputs.keys()])
+        content_loss *= self.content_weight / len(self.content_layers)
+        loss = style_loss + content_loss
+        return loss, style_loss, content_loss
+
+    def run(self, content_image, style_image, epochs = 10, steps_per_epoch = 400):
+        """
+        Run the Neural Style Transfer algorithm.
+
+        Parameters
+        ----------
+            content_image (numpy.ndarray): Content image.
+            style_image (numpy.ndarray): Style image.
+            epochs (int): Number of training epochs.
+            steps_per_epoch (int): Number of steps per epoch.
         
+        """
+
         content_layers = self.content_layers
         style_layers = self.style_layers
 
         content_image = self.preprocess_image_neural(content_image)
         style_image = self.preprocess_image_neural(style_image)
 
-        extractor = self.StyleContentModel(style_layers, content_layers)
+        self.extractor = self.style_transfer_model(style_layers,content_layers)
 
-        style_targets = extractor(style_image)['style']
-        content_targets = extractor(content_image)['content']
+        self.style_targets = self.extractor(style_image)['style']
+        self.content_targets = self.extractor(content_image)['content']
 
         opt = tf.optimizers.legacy.Adam(learning_rate=0.02, beta_1=0.99, epsilon=1e-1)
-
-        style_weight = 1e3
-        content_weight = 1
-
-        def compute_loss(outputs):
-            style_outputs = outputs['style']
-            content_outputs = outputs['content']
-
-            style_loss = tf.add_n([tf.reduce_mean((style_outputs[name] - style_targets[name]) ** 2) 
-                                   for name in style_outputs.keys()])
-            style_loss *= style_weight / len(style_layers)
-
-            content_loss = tf.add_n([tf.reduce_mean((content_outputs[name] - content_targets[name]) ** 2) 
-                                     for name in content_outputs.keys()])
-            content_loss *= content_weight / len(content_layers)
-            loss = style_loss + content_loss
-            return loss, style_loss, content_loss
 
         @tf.function()
         def train_step(image):
             with tf.GradientTape() as tape:
-                outputs = extractor(image)
-                loss = compute_loss(outputs)
+                outputs = self.extractor(image)
+                loss = self.compute_loss(outputs)
                 # Apply total variation loss
                 loss += self.total_variation_weight * tf.image.total_variation(image)
 
-                #print("Style loss: {}".format(style_loss), "Content loss: {}".format(content_loss), end="\r")
-
-            grad = tape.gradient(loss, image)
-            opt.apply_gradients([(grad, image)])
+                grad = tape.gradient(loss, image)
+                opt.apply_gradients([(grad, image)])
 
         # Training loop
         image = tf.Variable(content_image)
@@ -175,7 +251,6 @@ class StyleTransfer(QObject):
         noise = tf.Variable(tf.random.uniform(content_image.shape, 0, 68))
         # mean between image and noise to start with a random image
         image = tf.Variable((0.8*image + noise) / 2)
-
 
         for n in range(epochs):
             for m in range(steps_per_epoch):
