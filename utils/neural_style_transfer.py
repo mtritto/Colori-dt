@@ -63,11 +63,13 @@ class NeuralStyleTransfer(QObject):
 
         Parameters
         ----------
-            image (numpy.ndarray): Input image.
+        image (numpy.ndarray)
+            Input image array.
 
-        Return
+        Returns
         ------
-            tensorflow.Tensor: Preprocessed image for VGG19 with shape (244,244,3).
+        tensorflow.Tensor
+            Preprocessed image tensor for VGG19 with shape (244,244,3).
         """
         # Preprocess image for VGG19
         image = tf.keras.applications.vgg19.preprocess_input(image)
@@ -82,10 +84,13 @@ class NeuralStyleTransfer(QObject):
  
         Parameters
         ----------
-            processed_img (numpy.ndarray): Processed image.
-            content_image_aspect_ratio (float): Aspect ratio of the content image.
+        processed_img (numpy.ndarray)
+            Processed image.
 
-        Return
+        content_image_aspect_ratio (float)
+            Aspect ratio of the content image.
+
+        Returns
         ------
             numpy.ndarray: Deprocessed image for presentation as uint8 ndarray.
         """
@@ -112,11 +117,13 @@ class NeuralStyleTransfer(QObject):
 
         Parameters
         ----------
-            input_tensor (tensorflow.Tensor): Input tensor.
+        input_tensor (tensorflow.Tensor)
+            Input tensor.
 
-        Return
+        Returns
         ------
-            tensorflow.Tensor: Gram matrix.
+        tensorflow.Tensor
+            Gram matrix of the input sensor.
         """
         result = tf.linalg.einsum('bijc,bijd->bcd', input_tensor, input_tensor)
         input_shape = tf.shape(input_tensor)
@@ -129,11 +136,13 @@ class NeuralStyleTransfer(QObject):
 
         Parameters
         ----------
-            layer_names (list): List of layer names.
+        layer_names (list)
+            List of layer names.
 
-        Return
+        Returns
         ------
-            tensorflow.keras.Model: VGG model with specified layers.
+        tensorflow.keras.Model
+            VGG model with specified layers.
         """
         vgg = tf.keras.applications.VGG19(include_top=False, weights='imagenet')
         vgg.trainable = False
@@ -149,12 +158,15 @@ class NeuralStyleTransfer(QObject):
 
         Parameters
         ----------
-            style_layers (list): List of style layers.
-            content_layers (list): List of content layers.
+        style_layers (list)
+            List of style layers.
+        content_layers (list)   
+            List of content layers.
 
-        Return
+        Returns
         ------
-            function: Style transfer model.
+        function
+            Style transfer model.
         """
         vgg = self.vgg_layers(style_layers + content_layers)
         num_style_layers = len(style_layers)
@@ -186,11 +198,13 @@ class NeuralStyleTransfer(QObject):
 
         Parameters
         ----------
-            outputs (dict): Dictionary containing style and content outputs.
+        outputs (dict)
+            Dictionary containing style and content outputs.
 
-        Return
+        Returns
         ------
-            tuple: Total loss, style loss, and content loss.
+        tuple  
+            Total loss, style loss, and content loss.
         """
         style_outputs = outputs['style']
         content_outputs = outputs['content']
@@ -211,10 +225,22 @@ class NeuralStyleTransfer(QObject):
 
         Parameters
         ----------
-            content_image (numpy.ndarray): Content image.
-            style_image (numpy.ndarray): Style image.
-            epochs (int): Number of training epochs.
-            steps_per_epoch (int): Number of steps per epoch.
+        content_image (numpy.ndarray)
+            Content image.
+        
+        style_image (numpy.ndarray)
+            Style image.
+
+        epochs (int)
+            Number of training epochs.
+            
+        steps_per_epoch
+            Number of steps per epoch.
+        
+        Returns
+        -------
+        None
+
         
         """
 

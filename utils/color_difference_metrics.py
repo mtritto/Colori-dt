@@ -5,6 +5,27 @@ import math
 
 
 def cie76_lab(reference_image, test_image):
+    """
+    Calculate color difference using CIEDE76 formula in CIELAB colorspace.
+
+    Parameters
+    ----------
+    reference_image : numpy.ndarray
+        The reference image.
+    test_image : numpy.ndarray
+        The test image.
+
+    Returns
+    -------
+    numpy.ndarray
+        Color difference image.
+
+    Raises
+    ------
+    ValueError
+        If reference and test images have different sizes.
+    """
+
     if reference_image.shape != test_image.shape:
         raise ValueError("Reference and test images must have the same size")
     # Convert images to LAB color space
@@ -17,6 +38,26 @@ def cie76_lab(reference_image, test_image):
     return deltaE 
 
 def cie76_luv(reference_image, test_image):
+    """
+    Calculate color difference using CIEDE76 formula in CIELUV colorspace.
+
+    Parameters
+    ----------
+    reference_image : numpy.ndarray
+        The reference image.
+    test_image : numpy.ndarray
+        The test image.
+
+    Returns
+    -------
+    numpy.ndarray
+        Color difference image.
+
+    Raises
+    ------
+    ValueError
+        If reference and test images have different sizes.
+    """
     if reference_image.shape != test_image.shape:
         raise ValueError("Reference and test images must have the same size")
     # Convert images to LUV color space
@@ -29,6 +70,34 @@ def cie76_luv(reference_image, test_image):
     return deltaE
 
 def cie94(reference_image, test_image, k_L=1, k_1=0.045, k_2=0.01):
+    """
+    Calculate color difference using CIEDE94 formula in CIELAB colorspace.
+
+    Parameters
+    ----------
+    reference_image : numpy.ndarray
+        The reference image.
+    test_image : numpy.ndarray
+        The test image.
+    k_L : float, optional
+        Lightness weighting factor, by default 1.
+    k_1 : float, optional
+        Chroma weighting factor, by default 0.045.
+    k_2 : float, optional
+        Hue weighting factor, by default 0.01.
+
+
+    Returns
+    -------
+    numpy.ndarray
+        Color difference image.
+
+    Raises
+    ------
+    ValueError
+        If reference and test images have different sizes.
+    """
+
     if reference_image.shape != test_image.shape:
         raise ValueError("Reference and test images must have the same size")
 
@@ -71,6 +140,33 @@ def cie94(reference_image, test_image, k_L=1, k_1=0.045, k_2=0.01):
     return delta_E
 
 def ciede2000(reference_image, test_image,  k_L=1, k_1=0.045, k_2=0.015):
+    """
+    Calculate color difference using CIEDE00 formula in CIELAB colorspace.
+
+    Parameters
+    ----------
+    reference_image : numpy.ndarray
+        The reference image.
+    test_image : numpy.ndarray
+        The test image.
+    k_L : float, optional
+        Lightness weighting factor, by default 1.
+    k_1 : float, optional
+        Chroma weighting factor, by default 0.045.
+    k_2 : float, optional
+        Hue weighting factor, by default 0.01.
+
+    Returns
+    -------
+    numpy.ndarray
+        Color difference image.
+
+    Raises
+    ------
+    ValueError
+        If reference and test images have different sizes.
+    """
+
     if reference_image.shape != test_image.shape:
         raise ValueError("Reference and test images must have the same size")
     
@@ -138,6 +234,29 @@ def ciede2000(reference_image, test_image,  k_L=1, k_1=0.045, k_2=0.015):
 
     
 def cmc(reference_image, test_image, ratio=2):
+    """
+    Calculate color difference using CMC formula in CIELAB colorspace.
+
+    Parameters
+    ----------
+    reference_image : numpy.ndarray
+        The reference image.
+    test_image : numpy.ndarray
+        The test image.
+    ratio : float, optional
+        Chroma factor, by default 2.
+
+    Returns
+    -------
+    numpy.ndarray
+        Color difference image.
+
+    Raises
+    ------
+    ValueError
+        If reference and test images have different sizes.
+    """
+
     if reference_image.shape != test_image.shape:
         raise ValueError("Reference and test images must have the same size")
     # Convert images to LAB color space
@@ -176,6 +295,30 @@ def cmc(reference_image, test_image, ratio=2):
 
 
 def icsm(reference_image, test_image, ref_angle=1):
+
+    """
+    Calculate color difference using ICSM formula in CIELUV colorspace.
+
+    Parameters
+    ----------
+    reference_image : numpy.ndarray
+        The reference image.
+    test_image : numpy.ndarray
+        The test image.
+    ref_angle : float, optional
+        Reference angle in degrees, by default 1.
+
+    Returns
+    -------
+    numpy.ndarray
+        Color difference image.
+
+    Raises
+    ------
+    ValueError
+        If reference and test images have different sizes.
+    """
+
     if reference_image.shape != test_image.shape:
         raise ValueError("Reference and test images must have the same size")
 
@@ -218,6 +361,28 @@ def icsm(reference_image, test_image, ref_angle=1):
     return diff.astype('uint8')
 
 def dergb(reference_image, test_image):
+
+    """
+    Calculate color difference using the euclidean distance in sRGB colorspace.
+
+    Parameters
+    ----------
+    reference_image : numpy.ndarray
+        The reference image.
+    test_image : numpy.ndarray
+        The test image.
+
+    Returns
+    -------
+    numpy.ndarray
+        Color difference image.
+
+    Raises
+    ------
+    ValueError
+        If reference and test images have different sizes.
+    """
+
     if reference_image.shape != test_image.shape:
         raise ValueError("Reference and test images must have the same size")
     # Calculate color difference in the RGB color space

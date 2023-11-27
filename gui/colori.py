@@ -16,6 +16,96 @@ from utils.color_difference_metrics import cie76_lab, cie76_luv, cie94, ciede200
 
 
 class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui_no_image_dialog, QObject):
+    """
+    This class connects the class for the neural style trasfer algorithm and the color difference methods 
+    into the GUI of Colori-DT.
+
+    The class also manages the threads to make the neural style transfer function non blocking in the GUI.
+
+    Attributes
+    ----------
+    nst : NeuralStyleTransfer
+        Instance of the NeuralStyleTransfer class.
+    selected_metric : str
+        Currently selected color difference metric.
+    reference_image_path : str or None
+        Path to the reference image.
+    test_image_path : str or None
+        Path to the test image.
+    transf_output_image : numpy.ndarray or None
+        Result of the neural style transfer.
+    diff_output_image : numpy.ndarray or None
+        Result of the color difference calculation.
+    test_image : numpy.ndarray or None
+        Loaded test image.
+    reference_image : numpy.ndarray or None
+        Loaded reference image.
+    transfer_canceled : bool
+        Flag indicating if the neural style transfer is canceled.
+
+    Methods
+    -------
+    open_about()
+        Opens the "About" dialog.
+    select_image(image_path)
+        Opens a file dialog to select an image and displays it in the GUI.
+    save_image()
+        Saves the output image (neural style transfer or color difference) to a file.
+    reset_reference_image()
+        Resets the reference image and related GUI elements.
+    reset_test_image()
+        Resets the test image and related GUI elements.
+    reset_transf_image()
+        Resets the image generated from the neural style transfer 
+        and related GUI elements.
+    reset_diff_image()
+        Resets the image generated from the color difference metrics
+        algorithms and related GUI elements.    
+    check_shape(reference_image, test_image)
+        Checks if the shape of reference and test images match.
+    open_pdf()
+        Opens the documentation PDF based on the operating system.
+    enable_transfer()
+        Enables the transfer button based on image selection.
+    enable_diff_calc()
+        Enables the color difference calculation button based on image selection.
+    calc_00lab(reference_image, test_image)
+        Calculates color difference using CIEDE2000 in CIELAB colorspace,
+        with specified parameters.
+    calc_76lab(reference_image, test_image)
+        Calculates color difference using CIEDE76 in CIELAB colorspace.
+    calc_76luv(reference_image, test_image)
+        Calculates color difference using CIEDE76, in CIELUV colorspace.
+    calc_94lab(reference_image, test_image)
+        Calculates color difference using CIEDE94 in LAB colorspace,
+        with specified parameters.
+    calc_cmc(reference_image, test_image)
+        Calculates color difference using CMC color difference formula
+        in LAB colorspace, with specified parameters.
+    calc_icsm(reference_image, test_image)
+        Calculates color difference using ICSM color difference formula
+        in LUV colorspace, with specified parameters.
+    calc_rgb(reference_image, test_image)
+        Calculates color difference using euclidean distance formula,
+        in sRGB colorspace.
+    select_metric()
+        Sets the selected color difference metric.
+    execute_color_difference()
+        Initiates the color difference calculation.
+    get_color_difference(reference_image, test_image)
+        Gets and displays the result of the color difference calculation in the GUI.
+    execute_style_transfer()
+        Initiates the neural style transfer in a separate thread.
+    update_transf_image(bytearr)
+        Updates the neural style transfer output image in the GUI.
+    update_progress(progress)
+        Updates the progress bar during neural style transfer.
+    on_transfer_finished()
+        Handles the completion of neural style transfer thread.
+    cancel_transfer()
+        Cancels the neural style transfer.
+    
+    """
     def __init__(self):
         super(Gui, self).__init__()
         self.setupUi(self)
@@ -28,6 +118,8 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
         self.diff_output_image = None
         self.test_image = None
         self.reference_image = None
+
+        # Following: connections and utils for the gui to work
         self.pb_ref_select.clicked.connect(self.select_image)
         self.pb_test_select.clicked.connect(self.select_image)
         self.pb_ref_reset.clicked.connect(self.reset_reference_image)
@@ -55,16 +147,46 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
         self.scene = QGraphicsScene()
         self.gv_transf_out.setScene(self.scene)
         self.transfer_canceled = False
-        # force interrupt of any running threads when closing the gui
        
 
     def open_about(self):
+        """
+        Opens the pop-up "About" dialog
+        
+        Parameters
+        ----------
+            None
+        Returns
+        -------
+            None
+
+        """
         self.about_dialog = QDialog()
         self.dialog_ui = Ui_Dialog_about()
         self.dialog_ui.setupUi(self.about_dialog)
         self.about_dialog.show()
 
     def select_image(self, image_path):
+        """        
+        Opens a file dialog to select an image and displays it in the GUI.
+
+        Parameters
+        ----------
+        image_path : str
+            A path to the image.
+            
+        Returns
+        -------
+        None
+
+        Notes
+        -----
+        - This method is typically connected to buttons for selecting reference and
+        test images in the GUI.
+        - Supports images with the extensions: '.jpg', '.jpeg', '.tiff', '.tif'.
+        - Converts images with an alpha channel ('RGBA') to RGB format.
+
+        """
         self.select_dialog = QFileDialog()
         self.select_dialog.setFileMode(QFileDialog.FileMode.ExistingFile)
         self.select_dialog.setNameFilter('Images (*.jpg *.jpeg *.tiff *.tif)')
@@ -115,6 +237,25 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
         
         
     def save_image(self):
+        """
+        Saves the output image (neural style transfer or color difference) to a file.
+
+        Parameters
+        ----------
+         None
+        
+        Returns
+        -------
+        None
+        
+        Notes
+        -----
+        - This method is  connected to buttons for exporting the result
+        of neural style transfer or color difference in the GUI.
+        - Displays a warning dialog if the output image is None.
+      
+        """
+        
         # Get the sender object (the button that was clicked)
 
         sender = self.sender()
@@ -145,6 +286,21 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
                 #imageio.imwrite(filename, out_image, format='tiff')
 
     def reset_reference_image(self):
+        """
+        Resets the reference image and related GUI elements.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+
+        Notes
+        -----
+        - This function is meant for usage within the Colori-DT GUI.
+        """
         self.reference_image_path = None
         self.reference_image = None
         self.gv_ref_img.setScene(None)
@@ -154,6 +310,21 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
         self.la_ref_w.setText('')
 
     def reset_test_image(self):
+        """
+        Resets the test image and related GUI elements.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+
+        Notes
+        -----
+        - This function is meant for usage within the Colori-DT GUI.
+        """
         self.test_image_path = None
         self.test_image = None
         self.gv_test_img.setScene(None)
@@ -163,6 +334,23 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
         self.la_test_w.setText('')
 
     def reset_transf_image(self):
+        """
+        Resets the image generated from the neural style transfer 
+        and related GUI elements.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+
+        Notes
+        -----
+        - This function is meant for usage within the Colori-DT GUI.
+
+        """
         self.output_transf_image = None
         self.gv_transf_out.setScene(None)
         self.prog_epoch.setValue(0)
@@ -171,10 +359,50 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
 
 
     def reset_diff_image(self):
+        """
+        Resets the image generated from the color difference metrics
+        algorithms and related GUI elements.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+
+        Notes
+        -----
+        - This function is meant for usage within the Colori-DT GUI.
+        
+        """
+
         self.output_diff_image = None
         self.gv_metrics_out.setScene(None)
     
     def check_shape(self,reference_image, test_image):
+        """
+        Checks if the shape of reference and test images match.
+
+        Parameters
+        ----------
+        reference_image : numpy.ndarray
+            The reference image.
+        test_image : numpy.ndarray
+            The test image.
+
+        Returns
+        -------
+        bool
+            True if the images match in size, False otherwise.
+
+        Notes
+        -----
+        - This function is meant for usage within the Colori-DT GUI.
+            
+        """
+
+        
         # Control if the images match in size
         #shape_dialog = Ui_Dialog_shape_error()
         if reference_image.shape != test_image.shape:
@@ -188,6 +416,13 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
             return True
     
     def open_pdf(self):
+        """
+        Opens the documentation PDF based on the operating system.
+
+        Notes
+        -----
+        - This function is meant for usage within the Colori-DT GUI.
+        """
         # Open tjhe documentation pdf according to the OS
         if sys.platform.startswith('darwin'):
             subprocess.call(('open', 'gui/resources/Colori-DT.pdf'))
@@ -197,12 +432,43 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
             subprocess.call(('xdg-open', 'gui/resources/Colori-DT.pdf'))
 
     def enable_transfer(self):
+        """
+        Enables the transfer button based on image selection.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+
+        Notes
+        -----
+        - This function is meant for usage within the Colori-DT GUI.
+
+        """
         if np.all(self.reference_image != None) and np.all(self.test_image != None):
             self.pb_transfer.setEnabled(True)
         else:
             self.pb_transfer.setEnabled(False)
             
     def enable_diff_calc(self):
+        """       
+        Enables the color difference calculation button based on image selection.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+
+        Notes
+        -----
+        - This function is meant for usage within the Colori-DT GUI.
+        """
         if np.all(self.reference_image != None) and np.all(self.test_image != None):            
             self.pb_diff_calc.setEnabled(True)
         else:
@@ -211,6 +477,28 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
     # Set the selected metric with parameters
     # not collapsed in a single function for future scalability
     def calc_00lab(self,reference_image, test_image):
+        """
+        Calculates color difference using CIEDE2000 in CIELAB colorspace,
+        with specified parameters.
+
+        Parameters
+        ----------
+        reference_image : numpy.ndarray
+            The image of reference
+        test_image : numpy.ndarray
+            The image to test
+        
+        Returns
+        -------
+        numpy.ndarray
+            Resulting color difference
+
+        Notes
+        -----
+        - This function is meant for usage within the Colori-DT GUI.
+
+        """
+
         k1 = self.sb_k1_00.value()
         k2 = self.sb_k2_00.value()
         kL = self.sb_kL_00.value()
@@ -219,17 +507,78 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
         return result
     
     def calc_76lab(self, reference_image, test_image):
+        """
+        Calculates color difference using CIEDE76 in CIELAB colorspace.
+
+        Parameters
+        ----------
+        reference_image : numpy.ndarray
+            The image of reference
+        test_image : numpy.ndarray
+            The image to test
+        
+        Returns
+        -------
+        numpy.ndarray
+            Resulting color difference
+
+        Notes
+        -----
+        - This function is meant for usage within the Colori-DT GUI.
+
+        """
         # No parameters to set
         result = cie76_lab(reference_image, test_image)
 
         return result
 
     def calc_76luv(self, reference_image, test_image):
+        """
+        Calculates color difference using CIEDE76, in CIELUV colorspace.
+
+        Parameters
+        ----------
+        reference_image : numpy.ndarray
+            The image of reference
+        test_image : numpy.ndarray
+            The image to test
+        
+        Returns
+        -------
+        numpy.ndarray
+            Resulting color difference
+
+        Notes
+        -----
+        - This function is meant for usage within the Colori-DT GUI.
+
+        """
         # No parameters to set
         result = cie76_luv(reference_image, test_image)
         return result
 
     def calc_94lab(self, reference_image, test_image):
+        """
+        Calculates color difference using CIEDE94 in LAB colorspace,
+        with specified parameters.
+
+        Parameters
+        ----------
+        reference_image : numpy.ndarray
+            The image of reference
+        test_image : numpy.ndarray
+            The image to test
+        
+        Returns
+        -------
+        numpy.ndarray
+            Resulting color difference
+
+        Notes
+        -----
+        - This function is meant for usage within the Colori-DT GUI.
+
+        """
         k1 = self.sb_k1_94.value()
         k2 = self.sb_k2_94.value()
         kL = self.sb_kL_94.value()
@@ -238,6 +587,27 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
         return result
     
     def calc_cmc(self, reference_image, test_image):
+        """
+        Calculates color difference using CMC color difference formula
+        in LAB colorspace, with specified parameters.
+
+        Parameters
+        ----------
+        reference_image : numpy.ndarray
+            The image of reference
+        test_image : numpy.ndarray
+            The image to test
+        
+        Returns
+        -------
+        numpy.ndarray
+            Resulting color difference
+
+        Notes
+        -----
+        - This function is meant for usage within the Colori-DT GUI.
+
+        """
         ratio = 1
         # Get the ratio from the gui
         if self.cb_ratio.currentText().startswith('2'):
@@ -247,24 +617,115 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
         return result
 
     def calc_icsm(self, reference_image, test_image):
+        """
+        Calculates color difference using ICSM color difference formula
+        in LUV colorspace, with specified parameters.
+
+        Parameters
+        ----------
+        reference_image : numpy.ndarray
+            The image of reference
+        test_image : numpy.ndarray
+            The image to test
+        
+        Returns
+        -------
+        numpy.ndarray
+            Resulting color difference
+
+        Notes
+        -----
+        - This function is meant for usage within the Colori-DT GUI.
+
+        """
         ref = self.sb_ang.value()
         result = icsm(reference_image, test_image, ref)
         return result
 
     def calc_rgb(self, reference_image, test_image):
+        """
+        Calculates color difference using euclidean distance formula,
+        in sRGB colorspace.
+
+        Parameters
+        ----------
+        reference_image : numpy.ndarray
+            The image of reference
+        test_image : numpy.ndarray
+            The image to test
+        
+        Returns
+        -------
+        numpy.ndarray
+            Resulting color difference
+        
+        Notes
+        -----
+        - This function is meant for usage within the Colori-DT GUI.
+
+        """
         result = dergb(reference_image, test_image)
         return result
 
     def select_metric(self):
         self.selected_metric = self.cb_metrics.currentText()
+        """
+        Sets the selected color difference metric.
+
+        Parameters
+        ----------
+        None
+        
+        Returns
+        -------
+        None
+
+        Notes
+        -----
+        - This function is meant for usage within the Colori-DT GUI.
+
+        """
 
     def execute_color_difference(self):
+        """
+        Initiates the color difference calculation.
+        Parameters
+        ----------
+        None
+        
+        Returns
+        -------
+        None
+
+        Notes
+        -----
+        - This function is meant for usage within the Colori-DT GUI.
+
+        """
         if self.pb_diff_calc.isEnabled:
             if self.check_shape(self.reference_image, self.test_image):
                 self.get_color_difference(self.reference_image, self.test_image)
             
 
     def get_color_difference(self, reference_image, test_image):
+        """
+        Gets and displays the result of the color difference calculation in the GUI.
+
+        Parameters
+        ----------
+        reference_image : numpy.ndarray
+            The reference image.
+        test_image : numpy.ndarray
+            The test image.
+
+        Returns
+        -------
+        None
+
+        Notes
+        -----
+        - This function is meant for usage within the Colori-DT GUI.
+        """
         # Define a dictionary with the metrics and the corresponding functions
         metrics = {
             'DE00(L*a*b*)': self.calc_00lab,
@@ -291,6 +752,21 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
     # Assign the transfer to a separate thread to avoid blocking the GUI and to show progresses while running
 
     def execute_style_transfer(self):
+        """
+        Initiates the neural style transfer in a separate thread.
+
+        Parameters
+        ----------
+        None
+        
+        Returns
+        -------
+        None
+
+        Notes
+        -----
+        - This function is meant for usage within the Colori-DT GUI.
+        """
         # Disable the transfer buttons
         self.transfer_canceled = False
         self.pb_transfer.setEnabled(False)
@@ -313,6 +789,23 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
         self.nst_thread.start()
     
     def update_transf_image(self, bytearr):
+        """
+        Updates the neural style transfer output image in the GUI.
+
+        Parameters
+        ----------
+        bytearr : QByteArray
+            Byte array representing the image data.
+        
+        Returns
+        -------
+        None
+
+        Notes
+        -----
+        - This function is meant for usage within the Colori-DT GUI.
+
+        """
         image_from_bytes = np.frombuffer(bytearr.data(), dtype=np.uint8).reshape(224,224,3)
         # resize image to graphics view size for export
 
@@ -328,6 +821,19 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
         self.gv_transf_out.viewport().update()
     
     def update_progress(self, progress):
+        """
+        Updates the progress bar during neural style transfer.
+
+        Parameters
+        ----------
+        progress : int
+            The progress value, typically ranging from 0 to the total number of epochs.
+
+        Returns
+        -------
+        None
+
+        """
         # Progress range is 0-9
         self.prog_epoch.setValue(0)
         if self.transfer_canceled:
@@ -343,6 +849,22 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
 
 
     def on_transfer_finished(self):
+        """
+        Handles the completion of neural style transfer thread.
+
+        Parameters
+        ----------
+        None
+        
+        Returns
+        -------
+        None
+
+        Notes
+        -----
+        - This function is meant for usage within the Colori-DT GUI.
+        
+        """
         # Disconnect signals and slots
         self.nst.finished.disconnect(self.on_transfer_finished)
         self.nst.result.disconnect(self.update_transf_image)
@@ -362,6 +884,23 @@ class Gui(QMainWindow, Ui_MainWindow, Ui_Dialog_shape_error, Ui_Dialog_about, Ui
         self.pb_export_transfer.setEnabled(True)
     
     def cancel_transfer(self):
+        """
+        Cancels the neural style transfer.
+
+        Parameters
+        ----------
+        None
+        
+        Returns
+        -------
+        None
+
+        Notes
+        -----
+        - This function is meant for usage within the Colori-DT GUI.
+
+        """
+
         self.transfer_canceled = True
         
 
